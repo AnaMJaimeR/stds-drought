@@ -24,15 +24,15 @@ library(tidyverse)
 library(raustats)
 
 # Read (from data) ABS excel download of 2016 Remoteness data
-RA_2016_AUST <- read_excel("Data/RA_2016_AUST.xlsx")
+RA_2016_AUST <- read_excel("data/RA_2016_AUST.xlsx")
 glimpse(RA_2016_AUST)
 
 # Read (from data) ABS excel download of 2011-19 population data
-POP_AUST <- read_excel("Data/POP_AUST.xlsx")
+POP_AUST <- read_excel("data/POP_AUST.xlsx")
 glimpse(POP_AUST)
 
 # Read (from data) ABS SA1-to-SA4 csv data
-SA1_4 <- read_csv("Data/SA1_2016_AUST.csv")
+SA1_4 <- read_csv("data/SA1_2016_AUST.csv")
 glimpse(SA1_4)
 distinct(SA1_4, SA4_NAME_2016)
 
@@ -161,10 +161,24 @@ SA4_RAPopWd <- SA1_4_POP_RA_SumPop_PopW_RATypeRankWghtd %>%
 SA4_RAPopWd
 SA4_RAPopWd %>% print(n = 100)
 
+
+#Correct some names
+unemploy_sa4 <- c("Greater Hobart","New South Wales - Central West","Victoria - North West",
+                  "Western Australia - Outback (North and South)","Western Australia - Outback (North and South)",
+                  "Tasmania - South East","Tasmania - West and North West")
+rem_sa4 <- c("Hobart","Central West","North West","Western Australia - Outback (North)",
+              "Western Australia - Outback (South)","South East","West and North West")
+
+for(i in 1:length(prof_sa4)){
+  SA4_RAPopWd$SA4_name[SA4_RAPopWd$SA4_name == rem_sa4[i]] <- unemploy_sa4[i]
+}
+
 #Join PopWtdRA_rank to Unemployment data
 unemployment$territory_sa4 = str_trim(unemployment$territory_sa4, side = "both")
 unemployment_RAPopWtd <- left_join(unemployment, SA4_RAPopWd, by = c("territory_sa4" = "SA4_name"))
 glimpse(unemployment_RAPopWtd)
 
-glimpse(unemployment_RAPopWtd)
+summary(unemployment_RAPopWtd)
 distinct(unemployment_RAPopWtd)
+
+save(unemployment_RAPopWtd, file = "data/unemployment_remote.RData")

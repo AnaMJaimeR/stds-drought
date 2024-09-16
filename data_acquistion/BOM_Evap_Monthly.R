@@ -40,13 +40,15 @@ for (filename in bom_evap_monthly_list) {
   evap_df <- rbind(evap_df,onestation_df)
 }
 nrow(evap_df) #33122
+save(evap_df, file="data/HPT/org_evap.RData")
 
 # bom_evap_stn_list$station_id is factor and precipitation_df$stationid is character
 bom_evap_stn_list$station_id <- as.character(bom_evap_stn_list$station_id)
 # Join Evaporation Dataframe with station Dataframe by stationid
 evap_stn <- evap_df %>% 
   inner_join(bom_evap_stn_list, by= c("stationid" = "station_id"))
-head(evap_stn)
+nrow(evap_stn) #33122
+save(evap_stn,file ="data/HPT/bom_evap_stn_org.RData")
 
 # Reformat the date (V1, V2) from strin to "1999-09-01" in Sync with date in Unemployment Data
 colnames(evap_stn) <- c("from", "to", "evap", "stationid", "lat","long", "elv","stationname")
@@ -55,7 +57,7 @@ colnames(evap_stn) <- c("from", "to", "evap", "stationid", "lat","long", "elv","
 evap_stn <- evap_stn %>% 
   mutate(from = as.Date(as.character(from), '%Y%m%d')) %>% 
   mutate(to = as.Date(as.character(to), '%Y%m%d'))
-head(evap_stn)
+nrow(evap_stn) #33122
 
 #filter out the records prior to 1990
 evap_stn <- evap_stn %>%
@@ -81,13 +83,45 @@ load("data/unemployment.RData")
 for(i in 1:length(evaporation_sa4)){
   evap_sa4$territory_sa4[evap_sa4$territory_sa4 == evaporation_sa4[i]] <- unemploy_sa4[i]
 }
-head(evap_sa4) # 14337
+nrow(evap_sa4) # 14337
+save(evap_sa4, file="data/evap_sa4.RData")
 
-# Identidied the extra space at the end of unemployment$terriority_sa2 and Trimming it
+# Identified the extra space at the end of unemployment$terriority_sa2 and Trimming it
 # "Darwin " in ubemployment, "Darwin" in evap_sa4
 unique(evap_sa4$territory_sa4) # 29 terriority
 unique(unemployment$territory_sa4)
 unemployment$territory_sa4 <- str_trim(unemployment$territory_sa4, side="both")
+
+# Check are there any terriorities which has more than one station
+head(evap_sa4)
+unique(evap_sa4$stationid) # 60 stations
+terr_stn_count <- evap_sa4 %>% 
+  select(territory_sa4, stationid) %>% 
+  distinct() %>% 
+  group_by(territory_sa4) %>%
+  summarise(evap_stn_count = n()) %>%
+  arrange(desc(evap_stn_count)) 
+nrow(terr_stn_count) # 29 Terr have more than one station
+head(terr_stn_count)
+# Get SA4 list
+pure_sa4_list <- unemployment %>% 
+  select(territory_sa4) %>% 
+  distinct()
+pure_sa4_list # 87 
+# Check the missing 
+lookup_missing <- pure_sa4_list %>% 
+  left_join(terr_stn_count, by=c("territory_sa4"= "territory_sa4"))
+View(lookup_missing)
+write.csv(lookup_missing, file="data/HPT/evap_stn_count_by_terriority.csv")
+
+# Check any station which has partial data
+View(evap_sa4)
+partial_missing_data <- evap_sa4 %>% 
+  filter(is.na(evap)) %>% 
+  group_by(stationid, territory_sa4) %>% 
+  summarise(missing_count = n())
+View(partial_missing_data)
+
 # Merge with Unemployment Data
 evap_unemployment <- unemployment %>% 
   left_join(evap_sa4, by=c("territory_sa4" = "territory_sa4", "date" = "from"))
@@ -102,9 +136,18 @@ evap_unemployment <- evap_unemployment %>%
 # Save the finalised merged Evaporation ~ Unemployment data into R
 save(evap_unemployment, file="data/unemployment_evap.RData")
 
-
 # Extra Checking - Optional
-head(evap_unemployment) # 21489
-precp_sa4 %>% filter(str_detect(territory_sa4,"^Australian Capital Territory"))
+nrow(evap_unemployment) # 21489
+evap_sa4 %>% filter(str_detect(territory_sa4,"^Australian Capital Territory"))
+
+# Check missing data count by terriority and period
+View(evap_unemployment)
+missing_check_evap_unemp <- evap_unemployment %>% 
+  filter(is.na(evap_mean)) %>% 
+  group_by(territory_sa4) %>% 
+  summarise(missing_count = n(), max_date= max(date), min_date=min(date))
+write.csv(missing_check_evap_unemp, file="data/HPT/missing_check_evap_unemp.csv")
+
+
 
 
